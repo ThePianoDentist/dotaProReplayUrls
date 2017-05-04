@@ -1,0 +1,13 @@
+[package]
+name = "hello_world"
+version = "0.0.0"
+
+[dependencies]
+rocket = "0.2.6"
+rocket_codegen = "0.2.6"
+serde = "0.9"
+serde_derive = "0.9"
+serde_json = "0.9"
+rmp-serde = "^0.13"
+rocket_contrib = "0.2.6" 
+postgres = "0.14"
