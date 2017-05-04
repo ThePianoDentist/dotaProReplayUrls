@@ -15,9 +15,11 @@ use rocket::{Rocket, State};
 use postgres::{Connection, TlsMode};
 use rocket_contrib::{JSON, Value};
 
+type DbConn = Mutex<Connection>;
+
 #[derive(Serialize, Deserialize)]
 struct matchIDs{
-    contents: Vec<u64>
+    contents: Vec<i64>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -32,13 +34,17 @@ fn hello() -> &'static str {
 }
 
 #[post("/matches", format="application/json", data= "<jMatchIDs>")]
-fn matches(jMatchIDs: JSON<matchIDs>) -> JSON<Value>{
-    let matchIDs: Vec<u64> = jMatchIDs.0.contents;
+fn matches(jMatchIDs: JSON<matchIDs>, db_conn: State<DbConn>) -> JSON<Value>{
+    let matchIDs: Vec<i64> = jMatchIDs.0.contents;
+    print!("{:?}", matchIDs);
     let mut output: Vec<String> = Vec::new();
     for matchID in matchIDs.iter(){
-        let replaySalt: String = "ha".to_string();
-        let replayCluster: String = "bo".to_string();
-        let replayURL = format!("http://replay{}.valve.net/570/{}_{}.dem.bz2", replayCluster, matchID.to_string(), replaySalt);
+    let lock = db_conn.lock()
+        .expect("db connection lock");
+    let results = lock
+        .query("SELECT url from replayurls where matchid = $1",
+                   &[&matchID]).unwrap();
+        let replayURL = results.get(0).get(0);
         output.push(replayURL);
     }
     return JSON(json!(output))
@@ -46,11 +52,9 @@ fn matches(jMatchIDs: JSON<matchIDs>) -> JSON<Value>{
 }
 
 fn rocket() -> Rocket {
-    let conn = Connection::connect("postgres://jdog@localhost:5432/replayurls", TlsMode::None);
-        // Have Rocket manage the database pool.
-    rocket::ignite()
-        .manage(Mutex::new(conn))
-        .mount("/", routes![hello, matches])
+    let conn = Connection::connect("postgres://jdog@localhost:5432/replayurls", TlsMode::None).expect("wut");
+    // Have Rocket manage the database pool.
+    rocket::ignite().manage(Mutex::new(conn)).mount("/", routes![hello, matches])
 }
 
 fn main() {
