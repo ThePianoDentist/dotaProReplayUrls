@@ -45,6 +45,8 @@ def add_new_replay(qmID, session):
     res = apirequest("https://api.opendota.com/api/replays?match_id=%d" % qmID)
     if len(res) == 0:  # 1st cal fails for old games
         res = apirequest("https://api.opendota.com/api/replays?match_id=%d" % qmID)
+    if len(res) == 0:  # 1st cal fails for old games
+        res = apirequest("https://api.opendota.com/api/replays?match_id=%d" % qmID)
     result = res[0]
     replay_url = "http://replay{0}.valve.net/570/{1}_{2}.dem.bz2".format(
         result["cluster"], result["match_id"], result["replay_salt"]
@@ -102,11 +104,14 @@ def main():
                     if start_at and i == 0:
                         continue  # due to start_at. not start next to
                     if qmID not in existingIDs:
-                        try:
-                            add_new_replay(qmID, session)
-                            connection.commit()
-                        except:  # fck it. well add a fallback incase replay url missing
-                            continue
+                        session.execute("""SELECT matchID from replayurls where matchID = %d""" % qmID)
+                        if not session.fetchall():
+                            try:
+                                add_new_replay(qmID, session)
+                                connection.commit()
+                            except:  # fck it. well add a fallback incase replay url missing
+                                import traceback
+                                traceback.print_exc()
                     else:
                         finished = True
                 start_at = min(queryMatchIDs)
